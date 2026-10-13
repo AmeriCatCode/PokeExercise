@@ -4,7 +4,7 @@ A full-stack application built around a **Java / Spring Boot REST API** that int
 
 The backend follows **Clean Architecture** and is built with **TDD**. A **React** frontend consumes the API.
 
-> 🚧 **Status:** Step 0 (project setup) is done. The user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> 🚧 **Status:** Step 0 (project setup) and Step 1 (US-01, Pokémon catalog) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Documentation
 
@@ -84,6 +84,9 @@ cd frontend && npm install && npm run dev
 | Variable | Default | Used by |
 |---|---|---|
 | `SERVER_PORT` | `8080` | Backend |
+| `POKEAPI_BASE_URL` | `https://pokeapi.co/api/v2` | Backend |
+| `POKEAPI_READ_TIMEOUT` | `5s` | Backend: a slower PokeAPI answer returns `502` |
+| `POKEAPI_CACHE_MAX_SIZE` / `POKEAPI_CACHE_TTL` | `1000` / `24h` | Backend: PokeAPI response cache |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `pokedex` / `pokedex` / `pokedex` | docker-compose (local development only) |
 | `VITE_API_PROXY_TARGET` | `http://localhost:8080` | Frontend dev server proxy |
 
@@ -100,6 +103,14 @@ cd frontend && npm test
 ```
 
 Other frontend checks: `npm run lint`, `npm run typecheck`, `npm run build`.
+
+## API
+
+| Method & path | Access | Description |
+|---|---|---|
+| `GET /api/pokemon?page=0&size=20` | Public | US-01: catalog page (zero-based `page`, `size` 1–50, default 20). Each item has sprite, category, types, weight (kg) and abilities. `400` for invalid paging, `502` if PokeAPI is slow or down. |
+
+How US-01 works: PokeAPI's list only returns names, so for each Pokémon of the page the backend fetches its details and its species (where the category lives). The Pokémon of a page are fetched **in parallel on virtual threads**, with timeouts. If any of them fails, the whole page returns `502`. Responses are cached (Caffeine) by Pokémon id. A name in any case ("Pikachu", "pikachu") points to the same entry, errors are never cached, and simultaneous requests for the same uncached Pokémon make a single PokeAPI call.
 
 ## API conventions
 

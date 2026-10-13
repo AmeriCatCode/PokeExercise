@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.pokedex.domain.exception.InvalidRequestException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -60,12 +61,27 @@ class GlobalExceptionHandlerTest {
 				.andExpect(jsonPath("$.message").value("Method Not Allowed"));
 	}
 
+	@Test
+	void aBrokenBusinessRuleReturns400WithTheField() throws Exception {
+		mockMvc.perform(get("/test/invalid"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.message").value("Invalid request"))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("size"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("must be between 1 and 50"));
+	}
+
 	@RestController
 	static class FailingController {
 
 		@GetMapping("/test/boom")
 		String boom() {
 			throw new IllegalStateException("secret internal detail");
+		}
+
+		@GetMapping("/test/invalid")
+		String invalid() {
+			throw new InvalidRequestException("size", "must be between 1 and 50");
 		}
 	}
 }
