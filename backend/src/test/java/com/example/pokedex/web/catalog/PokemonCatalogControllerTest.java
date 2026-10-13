@@ -1,13 +1,16 @@
 package com.example.pokedex.web.catalog;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.pokedex.application.usecase.GetImportStatusUseCase;
 import com.example.pokedex.application.usecase.GetPokemonDetailUseCase;
 import com.example.pokedex.application.usecase.ListPokemonUseCase;
 import com.example.pokedex.domain.catalog.EvolutionStage;
@@ -21,6 +24,7 @@ import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.web.error.GlobalExceptionHandler;
 import com.example.pokedex.web.security.SecurityConfig;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -30,7 +34,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * Runs with the real security rules and no token: every request here also proves the catalog is public.
+ * Runs with the real security rules. Requests without a token also prove the catalog is public; with
+ * {@code jwt()} they come from a logged-in user.
  */
 @WebMvcTest(PokemonCatalogController.class)
 @Import({GlobalExceptionHandler.class, SecurityConfig.class})
@@ -58,6 +63,9 @@ class PokemonCatalogControllerTest {
 	@MockitoBean
 	private GetPokemonDetailUseCase getPokemonDetail;
 
+	@MockitoBean
+	private GetImportStatusUseCase getImportStatus;
+
 	@Test
 	void returnsTheDetailOfAPokemon() throws Exception {
 		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
@@ -80,6 +88,53 @@ class PokemonCatalogControllerTest {
 				.andExpect(jsonPath("$.evolution[1].speciesId").value(2))
 				.andExpect(jsonPath("$.evolution[1].name").value("ivysaur"))
 				.andExpect(jsonPath("$.evolution[1].evolvesFrom").value("bulbasaur"));
+	}
+
+	// --- "imported" indicator (US-03) ----------------------------------------------------------------
+
+	@Test
+	void aLoggedInUserSeesThatThePokemonIsImportedAndItsLocalId() throws Exception {
+		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
+		when(getImportStatus.localIdOf(1)).thenReturn(Optional.of(7L));
+
+		mockMvc.perform(get("/api/pokemon/bulbasaur").with(jwt()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.name").value("bulbasaur"))
+				.andExpect(jsonPath("$.imported").value(true))
+				.andExpect(jsonPath("$.localId").value(7));
+	}
+
+	@Test
+	void aLoggedInUserSeesThatThePokemonIsNotImported() throws Exception {
+		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
+		when(getImportStatus.localIdOf(1)).thenReturn(Optional.empty());
+
+		mockMvc.perform(get("/api/pokemon/bulbasaur").with(jwt()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.imported").value(false))
+				.andExpect(jsonPath("$.localId").doesNotExist());
+	}
+
+	@Test
+	void aVisitorGetsNoImportInformation() throws Exception {
+		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
+
+		mockMvc.perform(get("/api/pokemon/bulbasaur"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.imported").doesNotExist())
+				.andExpect(jsonPath("$.localId").doesNotExist())
+				// Fields without a value stay in the response: only the import information is left out.
+				.andExpect(jsonPath("$.evolution[0].evolvesFrom").value(nullValue()));
+		verify(getImportStatus, never()).localIdOf(anyInt());
+	}
+
+	@Test
+	void theImportStatusIsLookedUpOnEveryRequestNeverCached() throws Exception {
+		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
+		when(getImportStatus.localIdOf(1)).thenReturn(Optional.empty(), Optional.of(7L));
+
+		mockMvc.perform(get("/api/pokemon/bulbasaur").with(jwt())).andExpect(jsonPath("$.imported").value(false));
+		mockMvc.perform(get("/api/pokemon/bulbasaur").with(jwt())).andExpect(jsonPath("$.imported").value(true));
 	}
 
 	@Test

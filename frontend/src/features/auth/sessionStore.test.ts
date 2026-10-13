@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { clearSession, getSession, onSessionExpired, sessionExpired, setSession, type Session } from './sessionStore'
+import {
+  clearSession,
+  getSession,
+  onSessionExpired,
+  sessionExpired,
+  sessionHasExpired,
+  setSession,
+  type Session,
+} from './sessionStore'
 
 const inOneHour = () => new Date(Date.now() + 60 * 60 * 1000).toISOString()
 
@@ -47,5 +55,31 @@ describe('sessionStore', () => {
     expect(listener).toHaveBeenCalledOnce()
     expect(getSession()).toBeNull()
     unsubscribe()
+  })
+
+  describe('sessionHasExpired', () => {
+    it('is true after the API rejected the token', () => {
+      setSession(session())
+
+      sessionExpired()
+
+      expect(sessionHasExpired()).toBe(true)
+    })
+
+    it('is true when the time of the token ran out', () => {
+      setSession(session({ expiresAt: new Date(Date.now() - 1000).toISOString() }))
+
+      expect(sessionHasExpired()).toBe(true)
+    })
+
+    it('is false after a logout, and once logged in again', () => {
+      setSession(session())
+      clearSession()
+      expect(sessionHasExpired()).toBe(false)
+
+      sessionExpired()
+      setSession(session())
+      expect(sessionHasExpired()).toBe(false)
+    })
   })
 })

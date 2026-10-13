@@ -9,6 +9,10 @@ export function fetchCatalogPage(page: number, size: number, signal?: AbortSigna
   return getJson<PageResponse<PokemonSummary>>('/api/pokemon', { params: { page, size }, signal })
 }
 
-export function fetchPokemonDetail(idOrName: string, signal?: AbortSignal) {
-  return getJson<PokemonDetail>(`/api/pokemon/${encodeURIComponent(idOrName)}`, { signal })
+/**
+ * @param options.auth send the login token: the answer then also says whether the Pokémon is imported.
+ *   If the token is rejected, the session has expired (see `http.ts`).
+ */
+export function fetchPokemonDetail(idOrName: string, options: { signal?: AbortSignal; auth?: boolean } = {}) {
+  return getJson<PokemonDetail>(`/api/pokemon/${encodeURIComponent(idOrName)}`, options)
 }

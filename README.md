@@ -4,7 +4,7 @@ A full-stack application built around a **Java / Spring Boot REST API** that int
 
 The backend follows **Clean Architecture** and is built with **TDD**. A **React** frontend consumes the API.
 
-> 🚧 **Status:** Step 0 (project setup), Step 1 (US-01, Pokémon catalog), Step 2 (US-02, detail view) and Step 3 (authentication) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> 🚧 **Status:** Step 0 (project setup), Step 1 (US-01, Pokémon catalog), Step 2 (US-02, detail view), Step 3 (authentication) and Step 4 (US-03, import) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Documentation
 
@@ -118,13 +118,18 @@ Other frontend checks: `npm run lint`, `npm run typecheck`, `npm run build`.
 | `POST /api/auth/register` | Public | Create an account: `{ username, email, password }`. `201` with the user (never the password), `400` for invalid data, `409` if the username or email is taken. |
 | `POST /api/auth/login` | Public | `{ username, password }` → `200` with `{ token, tokenType: "Bearer", expiresAt, user }`; `401` for wrong credentials. |
 | `GET /api/auth/me` | Protected | The logged-in user. `401` without a token or with an expired/invalid one. |
-| `GET /api/pokemon/{idOrName}` | Public | US-02: detail by number or name (any case): official artwork, category, types, height, weight, abilities, base stats, description and evolution lineage. `404` for an unknown Pokémon, `400` for an invalid name, `502` if PokeAPI is slow or down. |
+| `GET /api/pokemon/{idOrName}` | Public | US-02: detail by number or name (any case): official artwork, category, types, height, weight, abilities, base stats, description and evolution lineage. With a token, it also says whether the Pokémon is imported: `imported` and, when true, `localId`. Visitors get neither field. `404` for an unknown Pokémon, `400` for an invalid name, `502` if PokeAPI is slow or down. |
+| `POST /api/local-pokemon` | Protected | US-03: import `{ idOrName }` from PokeAPI. `201` with the local copy (PokeAPI data, empty `localName`, `localRegion`, `tags`, and its `version`) and a `Location` header; `404` if PokeAPI has no such Pokémon, `409` if it is already imported (also when two imports run at the same moment), `502` if PokeAPI is slow or down. |
+| `GET /api/local-pokemon?page=0&size=20` | Protected | The local Pokémon, in Pokédex order. Same paging rules as the catalog. |
+| `GET /api/local-pokemon/{id}` | Protected | One local Pokémon. `404` if it doesn't exist (e.g. another user deleted it). |
 
 How US-01 works: PokeAPI's list only returns names, so for each Pokémon of the page the backend fetches its details and its species (where the category lives). The Pokémon of a page are fetched **in parallel on virtual threads**, with timeouts. If any of them fails, the whole page returns `502`. Responses are cached (Caffeine) by Pokémon id. A name in any case ("Pikachu", "pikachu") points to the same entry, errors are never cached, and simultaneous requests for the same uncached Pokémon make a single PokeAPI call.
 
 How US-02 works: the detail combines three PokeAPI resources: the Pokémon (artwork, types, stats), its species (category and the most recent English Pokédex text, cleaned of the games' line breaks) and the species' evolution chain. The chain is a tree, flattened into ordered stages; each stage records what it evolves from, so branching evolutions (Eevee, Wurmple) display correctly. All three resources are cached, so a repeated detail makes no PokeAPI call.
 
 How authentication works: passwords are stored as BCrypt hashes. Login returns a signed JWT (HS256) that expires after `JWT_TTL`. Protected requests send it as `Authorization: Bearer <token>`. The API is stateless (no server session); logging out deletes the token in the browser. Routes are **closed by default**: only registration, login, the catalog, health and the API docs are public. Usernames and emails are unique whatever their letter case, and the database's unique constraints guarantee it even when two people register the same name at the same moment.
+
+How US-03 works: the import first fetches the Pokémon from PokeAPI (through the same cache), **outside any database transaction**, so a slow PokeAPI never holds a database connection; only then is it saved, in one short transaction. The PokeAPI data is copied once (with its types, abilities, stats and evolution in child tables) and never changes afterwards; the proprietary fields start empty. The `pokeapi_id` column is unique, so the database decides when two users import the same Pokémon at the same moment: one gets `201`, the other `409`, never a `500`. On the catalog detail, the "imported" flag is a fresh database lookup on every request, never cached, so a Pokémon shows as imported right after anyone imports it. A token on the public detail route is optional, but if one is sent it must be valid: an expired or forged token gets `401`, and the frontend then asks the user to log in again (it only sends the token when it believes it is logged in).
 
 ## API conventions
 

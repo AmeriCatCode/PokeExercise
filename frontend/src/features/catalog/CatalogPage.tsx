@@ -1,16 +1,7 @@
-import { useSearchParams } from 'react-router'
 import { Pagination } from '../../components/ui/Pagination'
+import { usePageParam } from '../../components/ui/usePageParam'
 import { PokemonCard } from './PokemonCard'
 import { useCatalogPage } from './useCatalogPage'
-
-/** The URL holds the page (1-based, e.g. `?page=3`), so reloading or going back keeps it. */
-function usePageParam(): [number, (page: number) => void] {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const fromUrl = Number(searchParams.get('page'))
-  const page = Number.isInteger(fromUrl) && fromUrl >= 1 ? fromUrl - 1 : 0
-  const setPage = (next: number) => setSearchParams(next === 0 ? {} : { page: String(next + 1) })
-  return [page, setPage]
-}
 
 export function CatalogPage() {
   const [page, setPage] = usePageParam()

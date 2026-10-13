@@ -41,4 +41,8 @@ export type PokemonDetail = {
   stats: Stat[]
   description: string
   evolution: EvolutionStage[]
+  /** Logged-in users only: whether the Pokémon is in the local database. Absent for visitors. */
+  imported?: boolean
+  /** Logged-in users only, when imported: its id in the local database. */
+  localId?: number
 }

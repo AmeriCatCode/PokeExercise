@@ -1,10 +1,15 @@
 package com.example.pokedex.config;
 
+import com.example.pokedex.application.port.LocalPokemonRepositoryPort;
 import com.example.pokedex.application.port.PasswordHasherPort;
 import com.example.pokedex.application.port.PokemonCatalogPort;
 import com.example.pokedex.application.port.TokenIssuerPort;
 import com.example.pokedex.application.port.UserRepositoryPort;
+import com.example.pokedex.application.usecase.GetImportStatusUseCase;
+import com.example.pokedex.application.usecase.GetLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.GetPokemonDetailUseCase;
+import com.example.pokedex.application.usecase.ImportPokemonUseCase;
+import com.example.pokedex.application.usecase.ListLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.ListPokemonUseCase;
 import com.example.pokedex.application.usecase.LoginUseCase;
 import com.example.pokedex.application.usecase.RegisterUserUseCase;
@@ -25,6 +30,26 @@ public class UseCaseConfig {
 	@Bean
 	GetPokemonDetailUseCase getPokemonDetailUseCase(PokemonCatalogPort catalog) {
 		return new GetPokemonDetailUseCase(catalog);
+	}
+
+	@Bean
+	ImportPokemonUseCase importPokemonUseCase(PokemonCatalogPort catalog, LocalPokemonRepositoryPort repository) {
+		return new ImportPokemonUseCase(catalog, repository);
+	}
+
+	@Bean
+	ListLocalPokemonUseCase listLocalPokemonUseCase(LocalPokemonRepositoryPort repository) {
+		return new ListLocalPokemonUseCase(repository);
+	}
+
+	@Bean
+	GetLocalPokemonUseCase getLocalPokemonUseCase(LocalPokemonRepositoryPort repository) {
+		return new GetLocalPokemonUseCase(repository);
+	}
+
+	@Bean
+	GetImportStatusUseCase getImportStatusUseCase(LocalPokemonRepositoryPort repository) {
+		return new GetImportStatusUseCase(repository);
 	}
 
 	@Bean

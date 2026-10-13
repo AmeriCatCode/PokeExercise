@@ -3,6 +3,8 @@ package com.example.pokedex.web.error;
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
 import com.example.pokedex.domain.exception.InvalidCredentialsException;
 import com.example.pokedex.domain.exception.InvalidRequestException;
+import com.example.pokedex.domain.exception.LocalPokemonNotFoundException;
+import com.example.pokedex.domain.exception.PokemonAlreadyImportedException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
 import com.example.pokedex.domain.exception.UserAlreadyExistsException;
 import java.util.List;
@@ -84,6 +86,16 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(PokemonNotFoundException.class)
 	ResponseEntity<ErrorResponse> handlePokemonNotFound(PokemonNotFoundException ex) {
 		return build(HttpStatus.NOT_FOUND, "Pokémon not found", List.of());
+	}
+
+	@ExceptionHandler(PokemonAlreadyImportedException.class)
+	ResponseEntity<ErrorResponse> handleAlreadyImported(PokemonAlreadyImportedException ex) {
+		return build(HttpStatus.CONFLICT, "This Pokémon is already imported", List.of());
+	}
+
+	@ExceptionHandler(LocalPokemonNotFoundException.class)
+	ResponseEntity<ErrorResponse> handleLocalPokemonNotFound(LocalPokemonNotFoundException ex) {
+		return build(HttpStatus.NOT_FOUND, "This Pokémon no longer exists in the local database", List.of());
 	}
 
 	@ExceptionHandler(CatalogUnavailableException.class)

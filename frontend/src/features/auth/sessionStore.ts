@@ -19,6 +19,8 @@ const STORAGE_KEY = 'pokedex.session'
 const listeners = new Set<() => void>()
 const expiredListeners = new Set<() => void>()
 let current: Session | null = load()
+/** Whether the last session ended because the API rejected its token (not a logout). */
+let endedByExpiry = false
 
 function isActive(session: Session | null): session is Session {
   return session !== null && Date.parse(session.expiresAt) > Date.now()
@@ -53,21 +55,35 @@ export function getSession(): Session | null {
 
 export function setSession(session: Session) {
   current = session
+  endedByExpiry = false
   persist(session)
   notify()
 }
 
 /** Logout: forget the token. */
 export function clearSession() {
-  current = null
-  persist(null)
-  notify()
+  end(false)
 }
 
 /** The API rejected the token: forget it and tell the app, which opens the login screen. */
 export function sessionExpired() {
-  clearSession()
+  end(true)
   expiredListeners.forEach((listener) => listener())
+}
+
+/**
+ * True when there is no session because the last one expired (the API rejected its token, or its time ran
+ * out), not because the user logged out: protected screens then say so too.
+ */
+export function sessionHasExpired(): boolean {
+  return endedByExpiry || (current !== null && !isActive(current))
+}
+
+function end(byExpiry: boolean) {
+  current = null
+  endedByExpiry = byExpiry
+  persist(null)
+  notify()
 }
 
 export function onSessionExpired(listener: () => void): () => void {

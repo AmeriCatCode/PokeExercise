@@ -48,6 +48,9 @@ function AccountMenu() {
 
   return (
     <>
+      <NavLink to="/local" className={navLinkClass}>
+        My Pokémon
+      </NavLink>
       <span className="px-2 text-sm text-red-50">
         Signed in as <strong className="font-semibold text-white">{session.user.username}</strong>
       </span>
