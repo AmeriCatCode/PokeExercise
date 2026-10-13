@@ -2,8 +2,11 @@ package com.example.pokedex.application.usecase;
 
 import com.example.pokedex.application.port.LocalPokemonRepositoryPort;
 import com.example.pokedex.domain.catalog.PokemonDetail;
+import com.example.pokedex.domain.exception.LocalPokemonNotFoundException;
 import com.example.pokedex.domain.exception.PokemonAlreadyImportedException;
+import com.example.pokedex.domain.exception.VersionConflictException;
 import com.example.pokedex.domain.local.LocalPokemon;
+import com.example.pokedex.domain.local.ProprietaryFields;
 import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.domain.shared.PageRequest;
 import java.time.Instant;
@@ -35,6 +38,30 @@ class FakeLocalPokemonRepository implements LocalPokemonRepositoryPort {
 				newPokemon.localRegion(), newPokemon.tags(), 0L, now, now);
 		pokemon.add(saved);
 		return saved;
+	}
+
+	@Override
+	public LocalPokemon update(long id, long expectedVersion, ProprietaryFields fields) {
+		LocalPokemon current = current(id, expectedVersion);
+		LocalPokemon changed = current.withProprietaryFields(fields);
+		LocalPokemon saved = new LocalPokemon(id, changed.pokeApiData(), changed.localName(), changed.localRegion(),
+				changed.tags(), current.version() + 1, current.createdAt(), Instant.now());
+		pokemon.set(pokemon.indexOf(current), saved);
+		return saved;
+	}
+
+	@Override
+	public void delete(long id, long expectedVersion) {
+		pokemon.remove(current(id, expectedVersion));
+	}
+
+	/** The stored Pokémon, checked against the version the caller loaded, like the database does. */
+	private LocalPokemon current(long id, long expectedVersion) {
+		LocalPokemon current = findById(id).orElseThrow(() -> new LocalPokemonNotFoundException(id));
+		if (current.version() != expectedVersion) {
+			throw new VersionConflictException(id);
+		}
+		return current;
 	}
 
 	@Override

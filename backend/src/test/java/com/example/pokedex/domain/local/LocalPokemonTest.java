@@ -38,6 +38,21 @@ class LocalPokemonTest {
 	}
 
 	@Test
+	void anUpdateChangesOnlyTheProprietaryFields() {
+		LocalPokemon imported = new LocalPokemon(7L, BULBASAUR, null, null, List.of(), 3L, null, null);
+
+		LocalPokemon updated = imported.withProprietaryFields(
+				new ProprietaryFields("Bulbizarre", "Kanto", List.of("starter")));
+
+		assertThat(updated.localName()).isEqualTo("Bulbizarre");
+		assertThat(updated.localRegion()).isEqualTo("Kanto");
+		assertThat(updated.tags()).containsExactly("starter");
+		assertThat(updated.id()).isEqualTo(7L);
+		assertThat(updated.pokeApiData()).isEqualTo(BULBASAUR);
+		assertThat(updated.version()).isEqualTo(3L);
+	}
+
+	@Test
 	void tagsCannotBeChangedFromOutside() {
 		List<String> tags = new java.util.ArrayList<>(List.of("starter"));
 		LocalPokemon pokemon = new LocalPokemon(7L, BULBASAUR, "Bulbizarre", "Kanto", tags, 0L, null, null);

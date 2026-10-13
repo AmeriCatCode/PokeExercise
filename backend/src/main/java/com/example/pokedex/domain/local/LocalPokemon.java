@@ -36,6 +36,15 @@ public record LocalPokemon(
 		return new LocalPokemon(null, pokeApiData, null, null, List.of(), null, null, null);
 	}
 
+	/**
+	 * The same Pokémon with new proprietary fields: the PokeAPI data, id and version never change here
+	 * (the database gives the new version when it is saved).
+	 */
+	public LocalPokemon withProprietaryFields(ProprietaryFields fields) {
+		return new LocalPokemon(id, pokeApiData, fields.localName(), fields.localRegion(), fields.tags(), version,
+				createdAt, updatedAt);
+	}
+
 	/** The Pokémon's number in PokeAPI: unique in the local database. */
 	public int pokeapiId() {
 		return pokeApiData.id();

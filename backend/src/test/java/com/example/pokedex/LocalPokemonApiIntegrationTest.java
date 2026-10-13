@@ -1,10 +1,13 @@
 package com.example.pokedex;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,7 +46,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Import, local list/view and the "imported" indicator through the whole application:
+ * Import, local list/view, update, delete and the "imported" indicator through the whole application:
  * HTTP → security → controllers → use cases → PostgreSQL (Testcontainers). Only PokeAPI is faked.
  */
 @SpringBootTest(properties = "security.jwt.secret=" + LocalPokemonApiIntegrationTest.SECRET)
@@ -212,7 +215,116 @@ class LocalPokemonApiIntegrationTest {
 				.andExpect(jsonPath("$.message").value("Your session has expired or is invalid, please log in again"));
 	}
 
+	// --- update and delete: the concurrency scenarios of US-04 --------------------------------------
+
+	@Test
+	void anUpdateSavesTheProprietaryFieldsAndReturnsTheNewVersion() throws Exception {
+		int id = importedPikachu();
+
+		update(id, "Pikachu de Ash", "[\"Starter\", \"electric\"]", 0)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.localName").value("Pikachu de Ash"))
+				.andExpect(jsonPath("$.tags", containsInAnyOrder("starter", "electric")))
+				.andExpect(jsonPath("$.version").value(1));
+		withToken(get("/api/local-pokemon/" + id))
+				.andExpect(jsonPath("$.localName").value("Pikachu de Ash"))
+				.andExpect(jsonPath("$.name").value("pikachu"))
+				.andExpect(jsonPath("$.version").value(1));
+	}
+
+	@Test
+	void twoUsersEditingTheSamePokemonTheSecondSaveIsRejected() throws Exception {
+		// C1: Ana and Ben both loaded version 0. Ana saves first.
+		int id = importedPikachu();
+		update(id, "Ana's name", "[]", 0).andExpect(status().isOk());
+
+		update(id, "Ben's name", "[]", 0)
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.message").value("This Pokémon was changed by someone else, please reload it"));
+		withToken(get("/api/local-pokemon/" + id)).andExpect(jsonPath("$.localName").value("Ana's name"));
+	}
+
+	@Test
+	void aTagsOnlyChangeIncreasesTheVersionSoAnOldVersionIsRejected() throws Exception {
+		int id = importedPikachu();
+		update(id, null, "[\"starter\"]", 0).andExpect(jsonPath("$.version").value(1));
+
+		update(id, null, "[\"starter\", \"favorite\"]", 1).andExpect(jsonPath("$.version").value(2));
+		update(id, null, "[]", 1).andExpect(status().isConflict());
+	}
+
+	@Test
+	void deletingAPokemonSomeoneElseChangedIsRejected() throws Exception {
+		// C2: Ana saves a change; Ben, still on version 0, deletes.
+		int id = importedPikachu();
+		update(id, "Ana's name", "[]", 0).andExpect(status().isOk());
+
+		withToken(delete("/api/local-pokemon/" + id).param("version", "0")).andExpect(status().isConflict());
+		withToken(get("/api/local-pokemon/" + id)).andExpect(status().isOk());
+	}
+
+	@Test
+	void editingAPokemonThatWasJustDeletedReturns404() throws Exception {
+		// C3
+		int id = importedPikachu();
+		withToken(delete("/api/local-pokemon/" + id).param("version", "0")).andExpect(status().isNoContent());
+
+		update(id, "Too late", "[]", 0).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void twoUsersDeletingTheSamePokemonTheSecondGets404() throws Exception {
+		// C4
+		int id = importedPikachu();
+
+		withToken(delete("/api/local-pokemon/" + id).param("version", "0")).andExpect(status().isNoContent());
+		withToken(delete("/api/local-pokemon/" + id).param("version", "0")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	void afterADeleteTheCatalogDetailShowsItAsNotImportedAndItCanBeImportedAgain() throws Exception {
+		int id = importedPikachu();
+
+		withToken(delete("/api/local-pokemon/" + id).param("version", "0")).andExpect(status().isNoContent());
+
+		withToken(get("/api/pokemon/pikachu")).andExpect(jsonPath("$.imported").value(false));
+		importPokemon("pikachu").andExpect(status().isCreated());
+	}
+
+	@Test
+	void readOnlyFieldsCanNotBeChanged() throws Exception {
+		int id = importedPikachu();
+
+		withToken(put("/api/local-pokemon/" + id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"tags\": [], \"version\": 0, \"category\": \"Rat Pokémon\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("category"));
+		withToken(get("/api/local-pokemon/" + id))
+				.andExpect(jsonPath("$.category").value("Mouse Pokémon"))
+				.andExpect(jsonPath("$.version").value(0));
+	}
+
+	@Test
+	void updateAndDeleteRequireLogin() throws Exception {
+		mockMvc.perform(put("/api/local-pokemon/1").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"tags\": [], \"version\": 0}")).andExpect(status().isUnauthorized());
+		mockMvc.perform(delete("/api/local-pokemon/1").param("version", "0")).andExpect(status().isUnauthorized());
+	}
+
 	// --- helpers ----------------------------------------------------------------------------------
+
+	private int importedPikachu() throws Exception {
+		when(catalog.getPokemonDetail(anyString())).thenReturn(PIKACHU);
+		String body = importPokemon("pikachu").andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(body, "$.id");
+	}
+
+	private ResultActions update(int id, String localName, String tagsJson, long version) throws Exception {
+		String name = localName == null ? "null" : "\"" + localName + "\"";
+		return withToken(put("/api/local-pokemon/" + id).contentType(MediaType.APPLICATION_JSON)
+				.content("{\"localName\": %s, \"tags\": %s, \"version\": %d}".formatted(name, tagsJson, version)));
+	}
 
 	private ResultActions importPokemon(String idOrName) throws Exception {
 		return withToken(post("/api/local-pokemon")

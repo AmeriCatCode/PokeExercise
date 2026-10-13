@@ -39,6 +39,15 @@ export function postJson<T>(path: string, body: unknown, options: RequestOptions
   return request<T>('POST', path, body, options)
 }
 
+export function putJson<T>(path: string, body: unknown, options: RequestOptions = {}): Promise<T> {
+  return request<T>('PUT', path, body, options)
+}
+
+/** A DELETE answered with `204 No Content`. */
+export function deleteRequest(path: string, options: RequestOptions = {}): Promise<void> {
+  return request<void>('DELETE', path, undefined, options)
+}
+
 async function request<T>(method: string, path: string, body: unknown, options: RequestOptions): Promise<T> {
   // Absolute URL on the current origin: works in the browser and in tests (Node's fetch needs one).
   const url = new URL(path, window.location.origin)
@@ -63,6 +72,7 @@ async function request<T>(method: string, path: string, body: unknown, options: 
     }
     throw await toApiError(response)
   }
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 

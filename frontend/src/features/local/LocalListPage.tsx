@@ -1,17 +1,27 @@
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { Pagination } from '../../components/ui/Pagination'
 import { usePageParam } from '../../components/ui/usePageParam'
 import { LocalPokemonCard } from './LocalPokemonCard'
 import { useLocalPage } from './useLocalQueries'
 
+/** Location state of the list: a message about what just happened, e.g. after a delete. */
+export type LocalListLocationState = { notice?: string } | null
+
 /** "My local Pokémon": the Pokémon imported into the local database. */
 export function LocalListPage() {
+  const notice = (useLocation().state as LocalListLocationState)?.notice
   const [page, setPage] = usePageParam()
   const { data, isPending, isError, error, refetch, isFetching, isPlaceholderData } = useLocalPage(page)
 
   return (
     <section aria-busy={isFetching}>
       <h1 className="mb-4 text-2xl font-semibold">My local Pokémon</h1>
+
+      {notice && (
+        <p role="status" className="mb-4 rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+          {notice}
+        </p>
+      )}
 
       {isPending && <p className="py-12 text-center text-slate-600">Loading Pokémon…</p>}
 

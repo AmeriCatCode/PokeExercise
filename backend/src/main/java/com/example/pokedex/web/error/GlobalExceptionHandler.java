@@ -7,6 +7,7 @@ import com.example.pokedex.domain.exception.LocalPokemonNotFoundException;
 import com.example.pokedex.domain.exception.PokemonAlreadyImportedException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
 import com.example.pokedex.domain.exception.UserAlreadyExistsException;
+import com.example.pokedex.domain.exception.VersionConflictException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -58,6 +60,19 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, fieldErrors);
 	}
 
+	/** A required request parameter is missing, e.g. {@code version} on a delete. */
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
+		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST,
+				List.of(new ErrorResponse.FieldError(ex.getParameterName(), "is required")));
+	}
+
+	/** The body has read-only or unknown fields. */
+	@ExceptionHandler(InvalidFieldsException.class)
+	ResponseEntity<ErrorResponse> handleInvalidFields(InvalidFieldsException ex) {
+		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, ex.getFieldErrors());
+	}
+
 	/** The body is not valid JSON, or a value has the wrong type. */
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
@@ -91,6 +106,11 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(PokemonAlreadyImportedException.class)
 	ResponseEntity<ErrorResponse> handleAlreadyImported(PokemonAlreadyImportedException ex) {
 		return build(HttpStatus.CONFLICT, "This Pokémon is already imported", List.of());
+	}
+
+	@ExceptionHandler(VersionConflictException.class)
+	ResponseEntity<ErrorResponse> handleVersionConflict(VersionConflictException ex) {
+		return build(HttpStatus.CONFLICT, "This Pokémon was changed by someone else, please reload it", List.of());
 	}
 
 	@ExceptionHandler(LocalPokemonNotFoundException.class)

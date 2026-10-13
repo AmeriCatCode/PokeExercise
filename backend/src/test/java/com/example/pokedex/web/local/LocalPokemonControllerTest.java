@@ -1,26 +1,38 @@
 package com.example.pokedex.web.local;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.pokedex.application.usecase.DeleteLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.GetLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.ImportPokemonUseCase;
 import com.example.pokedex.application.usecase.ListLocalPokemonUseCase;
+import com.example.pokedex.application.usecase.UpdateLocalPokemonUseCase;
 import com.example.pokedex.domain.catalog.EvolutionStage;
 import com.example.pokedex.domain.catalog.PokemonDetail;
 import com.example.pokedex.domain.catalog.Stat;
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
+import com.example.pokedex.domain.exception.InvalidRequestException;
 import com.example.pokedex.domain.exception.LocalPokemonNotFoundException;
 import com.example.pokedex.domain.exception.PokemonAlreadyImportedException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
+import com.example.pokedex.domain.exception.VersionConflictException;
 import com.example.pokedex.domain.local.LocalPokemon;
 import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.web.error.GlobalExceptionHandler;
@@ -68,6 +80,12 @@ class LocalPokemonControllerTest {
 
 	@MockitoBean
 	private GetLocalPokemonUseCase getLocalPokemon;
+
+	@MockitoBean
+	private UpdateLocalPokemonUseCase updateLocalPokemon;
+
+	@MockitoBean
+	private DeleteLocalPokemonUseCase deleteLocalPokemon;
 
 	// --- import ----------------------------------------------------------------------------------
 
@@ -227,6 +245,169 @@ class LocalPokemonControllerTest {
 	@Test
 	void viewingALocalPokemonRequiresLogin() throws Exception {
 		mockMvc.perform(get("/api/local-pokemon/7")).andExpect(status().isUnauthorized());
+	}
+
+	// --- update (US-04) ----------------------------------------------------------------------------
+
+	@Test
+	void anUpdateReturns200WithTheNewVersion() throws Exception {
+		LocalPokemon updated = new LocalPokemon(7L, PIKACHU, "Pikachu de Ash", "Kanto", List.of("starter"), 4L,
+				CREATED, CREATED.plusSeconds(60));
+		when(updateLocalPokemon.update(7, 3, "Pikachu de Ash", "Kanto", List.of("starter"))).thenReturn(updated);
+
+		update(7, """
+				{"localName": "Pikachu de Ash", "localRegion": "Kanto", "tags": ["starter"], "version": 3}""")
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.localName").value("Pikachu de Ash"))
+				.andExpect(jsonPath("$.tags[0]").value("starter"))
+				.andExpect(jsonPath("$.version").value(4))
+				.andExpect(jsonPath("$.name").value("pikachu"));
+	}
+
+	@Test
+	void nullOrMissingLocalNameAndRegionClearThem() throws Exception {
+		when(updateLocalPokemon.update(7, 3, null, null, List.of())).thenReturn(IMPORTED);
+
+		update(7, "{\"tags\": [], \"version\": 3}").andExpect(status().isOk());
+
+		verify(updateLocalPokemon).update(7, 3, null, null, List.of());
+	}
+
+	@Test
+	void updatingAPokemonThatNoLongerExistsReturns404() throws Exception {
+		when(updateLocalPokemon.update(eq(7L), anyLong(), any(), any(), any()))
+				.thenThrow(new LocalPokemonNotFoundException(7));
+
+		update(7, "{\"localName\": \"x\", \"tags\": [], \"version\": 3}")
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.message").value("This Pokémon no longer exists in the local database"));
+	}
+
+	@Test
+	void updatingWithAnOldVersionReturns409() throws Exception {
+		when(updateLocalPokemon.update(eq(7L), anyLong(), any(), any(), any()))
+				.thenThrow(new VersionConflictException(7));
+
+		update(7, "{\"localName\": \"x\", \"tags\": [], \"version\": 2}")
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.status").value(409))
+				.andExpect(jsonPath("$.message").value("This Pokémon was changed by someone else, please reload it"));
+	}
+
+	@Test
+	void anUpdateWithoutVersionReturns400() throws Exception {
+		update(7, "{\"localName\": \"x\", \"tags\": []}")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("version"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("is required"));
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	@Test
+	void anUpdateWithoutTagsReturns400() throws Exception {
+		update(7, "{\"localName\": \"x\", \"version\": 1}")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("tags"));
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	@Test
+	void anUpdateTryingToChangeReadOnlyFieldsReturns400NamingThem() throws Exception {
+		update(7, """
+				{"localName": "x", "tags": [], "version": 1, "name": "raichu", "types": ["fire"]}""")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Invalid request"))
+				.andExpect(jsonPath("$.fieldErrors[*].field", containsInAnyOrder("name", "types")))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("is read-only: it comes from PokeAPI"));
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	@Test
+	void anUpdateWithAnUnknownFieldReturns400() throws Exception {
+		update(7, "{\"localName\": \"x\", \"tags\": [], \"version\": 1, \"nickname\": \"Sparky\"}")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("nickname"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("is not a known field"));
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	@Test
+	void anUpdateWithInvalidValuesReturns400() throws Exception {
+		when(updateLocalPokemon.update(eq(7L), anyLong(), any(), any(), any()))
+				.thenThrow(new InvalidRequestException("tags", "must not contain blank tags"));
+
+		update(7, "{\"tags\": [\" \"], \"version\": 1}")
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("tags"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("must not contain blank tags"));
+	}
+
+	@Test
+	void aMalformedUpdateReturns400() throws Exception {
+		update(7, "{\"localName\": ").andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Malformed request body"));
+		update(7, "{\"tags\": [], \"version\": \"abc\"}").andExpect(status().isBadRequest());
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	@Test
+	void anUpdateRequiresLogin() throws Exception {
+		mockMvc.perform(put("/api/local-pokemon/7").contentType(MediaType.APPLICATION_JSON)
+						.content("{\"tags\": [], \"version\": 1}"))
+				.andExpect(status().isUnauthorized());
+		verifyNoInteractions(updateLocalPokemon);
+	}
+
+	// --- delete (US-04) ----------------------------------------------------------------------------
+
+	@Test
+	void aDeleteReturns204() throws Exception {
+		mockMvc.perform(delete("/api/local-pokemon/7").param("version", "3").with(jwt()))
+				.andExpect(status().isNoContent());
+
+		verify(deleteLocalPokemon).delete(7, 3);
+	}
+
+	@Test
+	void deletingAPokemonThatNoLongerExistsReturns404() throws Exception {
+		// For example, the second of two users deleting it.
+		doThrow(new LocalPokemonNotFoundException(7)).when(deleteLocalPokemon).delete(7, 3);
+
+		mockMvc.perform(delete("/api/local-pokemon/7").param("version", "3").with(jwt()))
+				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void deletingWithAnOldVersionReturns409() throws Exception {
+		doThrow(new VersionConflictException(7)).when(deleteLocalPokemon).delete(7, 2);
+
+		mockMvc.perform(delete("/api/local-pokemon/7").param("version", "2").with(jwt()))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.message").value("This Pokémon was changed by someone else, please reload it"));
+	}
+
+	@Test
+	void aDeleteWithoutVersionReturns400() throws Exception {
+		mockMvc.perform(delete("/api/local-pokemon/7").with(jwt()))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("version"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("is required"));
+		mockMvc.perform(delete("/api/local-pokemon/7").param("version", "abc").with(jwt()))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("version"));
+		verifyNoInteractions(deleteLocalPokemon);
+	}
+
+	@Test
+	void aDeleteRequiresLogin() throws Exception {
+		mockMvc.perform(delete("/api/local-pokemon/7").param("version", "3")).andExpect(status().isUnauthorized());
+		verifyNoInteractions(deleteLocalPokemon);
+	}
+
+	private ResultActions update(long id, String body) throws Exception {
+		return mockMvc.perform(put("/api/local-pokemon/" + id).with(jwt())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(body));
 	}
 
 	private ResultActions importAsLoggedInUser(String body) throws Exception {

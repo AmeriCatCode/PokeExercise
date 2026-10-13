@@ -4,6 +4,7 @@ import com.example.pokedex.domain.catalog.EvolutionStage;
 import com.example.pokedex.domain.catalog.PokemonDetail;
 import com.example.pokedex.domain.catalog.Stat;
 import com.example.pokedex.domain.local.LocalPokemon;
+import com.example.pokedex.domain.local.ProprietaryFields;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -16,7 +17,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
@@ -137,6 +137,21 @@ class PokemonEntity {
 		return entity;
 	}
 
+	long version() {
+		return version;
+	}
+
+	/** Only the proprietary fields can change; the PokeAPI columns are read-only. */
+	void changeProprietaryFields(ProprietaryFields fields) {
+		localName = fields.localName();
+		localRegion = fields.localRegion();
+		tags.clear();
+		tags.addAll(fields.tags());
+		// Always changes a column of the Pokémon itself, so every save increments its version, also when
+		// only the tags (a child table) changed.
+		updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+	}
+
 	@PrePersist
 	void onCreate() {
 		// PostgreSQL keeps microseconds: truncate, so the saved value equals the one read back later.
@@ -144,17 +159,14 @@ class PokemonEntity {
 		updatedAt = createdAt;
 	}
 
-	@PreUpdate
-	void onUpdate() {
-		updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
-	}
-
 	/** Must run inside a transaction: the lists are loaded lazily. */
 	LocalPokemon toDomain() {
 		PokemonDetail data = new PokemonDetail(pokeapiId, name, spriteUrl, imageUrl, category, types, heightM,
 				weightKg, abilities, stats.stream().map(StatValue::toDomain).toList(), description,
 				evolution.stream().map(EvolutionStageValue::toDomain).toList());
-		return new LocalPokemon(id, data, localName, localRegion, List.copyOf(tags), version, createdAt, updatedAt);
+		// Sorted here too, so a just-saved Pokémon lists its tags like one read back from the database.
+		return new LocalPokemon(id, data, localName, localRegion, tags.stream().sorted().toList(), version, createdAt,
+				updatedAt);
 	}
 
 	@Embeddable

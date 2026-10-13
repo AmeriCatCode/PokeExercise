@@ -5,6 +5,7 @@ import com.example.pokedex.application.port.PasswordHasherPort;
 import com.example.pokedex.application.port.PokemonCatalogPort;
 import com.example.pokedex.application.port.TokenIssuerPort;
 import com.example.pokedex.application.port.UserRepositoryPort;
+import com.example.pokedex.application.usecase.DeleteLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.GetImportStatusUseCase;
 import com.example.pokedex.application.usecase.GetLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.GetPokemonDetailUseCase;
@@ -13,6 +14,7 @@ import com.example.pokedex.application.usecase.ListLocalPokemonUseCase;
 import com.example.pokedex.application.usecase.ListPokemonUseCase;
 import com.example.pokedex.application.usecase.LoginUseCase;
 import com.example.pokedex.application.usecase.RegisterUserUseCase;
+import com.example.pokedex.application.usecase.UpdateLocalPokemonUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -45,6 +47,16 @@ public class UseCaseConfig {
 	@Bean
 	GetLocalPokemonUseCase getLocalPokemonUseCase(LocalPokemonRepositoryPort repository) {
 		return new GetLocalPokemonUseCase(repository);
+	}
+
+	@Bean
+	UpdateLocalPokemonUseCase updateLocalPokemonUseCase(LocalPokemonRepositoryPort repository) {
+		return new UpdateLocalPokemonUseCase(repository);
+	}
+
+	@Bean
+	DeleteLocalPokemonUseCase deleteLocalPokemonUseCase(LocalPokemonRepositoryPort repository) {
+		return new DeleteLocalPokemonUseCase(repository);
 	}
 
 	@Bean

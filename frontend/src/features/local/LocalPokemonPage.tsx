@@ -1,10 +1,10 @@
-import { useId, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError } from '../../api/http'
 import { PokemonDetailView } from '../catalog/PokemonDetailView'
+import { LocalDataPanel } from './LocalDataPanel'
 import { useLocalListReturnUrl } from './localNavigation'
-import { TagList } from './TagList'
-import { toPokemonDetail, type LocalPokemon } from './types'
+import { toPokemonDetail } from './types'
 import { useLocalPokemon } from './useLocalQueries'
 
 /** Local ids are positive whole numbers; anything else can't exist, so it isn't even requested. */
@@ -60,7 +60,12 @@ export function LocalPokemonPage() {
         </div>
       )}
 
-      {data && <PokemonDetailView pokemon={toPokemonDetail(data)} panel={<LocalDataPanel pokemon={data} />} />}
+      {data && (
+        <PokemonDetailView
+          pokemon={toPokemonDetail(data)}
+          panel={<LocalDataPanel pokemon={data} onReload={() => refetch().then((result) => result.data)} />}
+        />
+      )}
     </div>
   )
 }
@@ -77,37 +82,3 @@ function Message({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-function LocalDataPanel({ pokemon }: { pokemon: LocalPokemon }) {
-  const headingId = useId()
-  const notSet = <span className="text-slate-400">Not set</span>
-
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-left"
-    >
-      <h2 id={headingId} className="text-lg font-semibold">
-        Local data
-      </h2>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="font-medium text-slate-500">Local name</dt>
-        <dd className="break-words">{pokemon.localName ?? notSet}</dd>
-        <dt className="font-medium text-slate-500">Local region</dt>
-        <dd className="break-words">{pokemon.localRegion ?? notSet}</dd>
-        <dt className="font-medium text-slate-500">Tags</dt>
-        <dd>
-          {pokemon.tags.length > 0 ? (
-            <TagList tags={pokemon.tags} align="start" />
-          ) : (
-            <span className="text-slate-400">No tags</span>
-          )}
-        </dd>
-        <dt className="font-medium text-slate-500">Imported</dt>
-        <dd>{new Date(pokemon.createdAt).toLocaleDateString()}</dd>
-      </dl>
-      <Link to={`/pokemon/${pokemon.name}`} className="text-sm font-medium text-red-700 hover:underline">
-        View in catalog
-      </Link>
-    </section>
-  )
-}
