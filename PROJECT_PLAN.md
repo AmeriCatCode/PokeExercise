@@ -196,8 +196,6 @@ Each story goes domain → use case → adapters → controller → frontend, wi
 - Demo the concurrency scenarios live with two browsers: Ana/Ben edit → 409, edit vs. delete → 409, simultaneous import → 409 → "Already imported".
 - Explain the accepted behaviors and trade-offs.
 
-Total estimate: about 8.5 working days.
-
 ---
 
 ## 6b. Concurrency & Fresh-Data Coverage

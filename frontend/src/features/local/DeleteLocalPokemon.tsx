@@ -12,12 +12,14 @@ type DeleteLocalPokemonProps = {
 }
 
 /**
- * The Delete button, with a confirmation step. It sends the version on screen, so a change made by
- * someone else since is never deleted unseen (409). If someone already deleted it (404), the job is done.
+ * The Delete button, with a confirmation step. It sends the version the user saw when clicking Delete,
+ * even if a background reload shows a newer one while the confirmation is open: a change made by someone
+ * else since is never deleted unseen (409). If someone already deleted it (404), the job is done.
  */
 export function DeleteLocalPokemon({ pokemon, onReload }: DeleteLocalPokemonProps) {
   const navigate = useNavigate()
-  const [confirming, setConfirming] = useState(false)
+  // The version the user decided to delete; null while no confirmation is open.
+  const [versionToDelete, setVersionToDelete] = useState<number | null>(null)
   const displayName = formatName(pokemon.name)
   const deletion = useDeleteLocalPokemon(pokemon.id, (alreadyDeleted) => {
     const state: LocalListLocationState = {
@@ -32,14 +34,14 @@ export function DeleteLocalPokemon({ pokemon, onReload }: DeleteLocalPokemonProp
 
   const close = () => {
     deletion.reset()
-    setConfirming(false)
+    setVersionToDelete(null)
   }
 
-  if (!confirming) {
+  if (versionToDelete === null) {
     return (
       <button
         type="button"
-        onClick={() => setConfirming(true)}
+        onClick={() => setVersionToDelete(pokemon.version)}
         className="rounded-md border border-red-300 bg-white px-4 py-2 font-medium text-red-700 hover:bg-red-50"
       >
         Delete
@@ -71,7 +73,7 @@ export function DeleteLocalPokemon({ pokemon, onReload }: DeleteLocalPokemonProp
         <button
           type="button"
           disabled={deletion.isPending || conflict}
-          onClick={() => deletion.mutate(pokemon.version)}
+          onClick={() => deletion.mutate(versionToDelete)}
           className="rounded-md bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {deletion.isPending ? 'Deleting…' : 'Yes, delete'}

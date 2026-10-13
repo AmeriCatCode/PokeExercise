@@ -334,6 +334,28 @@ describe('Deleting a local Pokémon', () => {
     expect(db.pokemon).not.toBeNull()
   })
 
+  it('deletes the version the user saw when asking to delete, even if a reload brings a newer one meanwhile', async () => {
+    const user = userEvent.setup()
+    const db = backend()
+    logInAs('ash')
+    renderApp('/local/7')
+    await user.click(await screen.findByRole('button', { name: 'Delete' }))
+
+    // Ana saves a change; it arrives with a background reload while the confirmation is open.
+    db.changeByAnotherUser({ localName: "Ana's name" })
+    act(() => {
+      focusManager.setFocused(false)
+      focusManager.setFocused(true)
+    })
+    await within(screen.getByRole('region', { name: 'Local data' })).findByText("Ana's name")
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
+
+    // The user decided on version 3, never confirmed deleting Ana's change: 409, nothing deleted.
+    expect(await screen.findByRole('alert')).toHaveTextContent('changed by someone else')
+    expect(db.deletes).toEqual([3])
+    expect(db.pokemon).not.toBeNull()
+  })
+
   it('when another user already deleted it (404), treats it as deleted and goes to the list', async () => {
     const user = userEvent.setup()
     const db = backend()
