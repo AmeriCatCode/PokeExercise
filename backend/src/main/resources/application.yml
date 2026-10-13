@@ -4,6 +4,15 @@ spring:
   threads:
     virtual:
       enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/pokedex}
+    username: ${DB_USERNAME:pokedex}
+    password: ${DB_PASSWORD:pokedex}
+  jpa:
+    # The schema is owned by Flyway (src/main/resources/db/migration); Hibernate only checks it matches.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
 server:
   port: ${SERVER_PORT:8080}
@@ -15,6 +24,14 @@ pokeapi:
   cache:
     max-size: ${POKEAPI_CACHE_MAX_SIZE:1000}
     ttl: ${POKEAPI_CACHE_TTL:24h}
+
+security:
+  jwt:
+    # Base64-encoded key of at least 32 bytes. Empty: a random key per start (fine for local development).
+    secret: ${JWT_SECRET:}
+    ttl: ${JWT_TTL:1h}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 
 management:
   endpoints:

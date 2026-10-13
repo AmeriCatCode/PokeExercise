@@ -6,7 +6,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-pokedex}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pokedex}
     ports:
-      - "5432:5432"
+      # Host port 5433, so it doesn't clash with a PostgreSQL installed on the machine (5432).
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pokedex-db:/var/lib/postgresql/data
     healthcheck:

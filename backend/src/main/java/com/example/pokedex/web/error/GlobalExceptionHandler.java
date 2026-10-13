@@ -1,14 +1,18 @@
 package com.example.pokedex.web.error;
 
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
+import com.example.pokedex.domain.exception.InvalidCredentialsException;
 import com.example.pokedex.domain.exception.InvalidRequestException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
+import com.example.pokedex.domain.exception.UserAlreadyExistsException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -43,10 +47,38 @@ public class GlobalExceptionHandler {
 				List.of(new ErrorResponse.FieldError(ex.getName(), message)));
 	}
 
+	/** A request body breaks a constraint, e.g. {@code @NotBlank String username}. */
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	ResponseEntity<ErrorResponse> handleBodyValidation(MethodArgumentNotValidException ex) {
+		List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
+				.map(error -> new ErrorResponse.FieldError(error.getField(), error.getDefaultMessage()))
+				.toList();
+		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, fieldErrors);
+	}
+
+	/** The body is not valid JSON, or a value has the wrong type. */
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
+		return build(HttpStatus.BAD_REQUEST, "Malformed request body", List.of());
+	}
+
 	@ExceptionHandler(InvalidRequestException.class)
 	ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex) {
 		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST,
 				List.of(new ErrorResponse.FieldError(ex.getField(), ex.getReason())));
+	}
+
+	@ExceptionHandler(UserAlreadyExistsException.class)
+	ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+		String message = "email".equals(ex.getField())
+				? "This email is already registered"
+				: "This username is already taken";
+		return build(HttpStatus.CONFLICT, message, List.of(new ErrorResponse.FieldError(ex.getField(), message)));
+	}
+
+	@ExceptionHandler(InvalidCredentialsException.class)
+	ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+		return build(HttpStatus.UNAUTHORIZED, "Invalid username or password", List.of());
 	}
 
 	@ExceptionHandler(PokemonNotFoundException.class)

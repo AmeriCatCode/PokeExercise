@@ -19,17 +19,25 @@ import com.example.pokedex.domain.exception.InvalidRequestException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
 import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.web.error.GlobalExceptionHandler;
+import com.example.pokedex.web.security.SecurityConfig;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+/**
+ * Runs with the real security rules and no token: every request here also proves the catalog is public.
+ */
 @WebMvcTest(PokemonCatalogController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, SecurityConfig.class})
 class PokemonCatalogControllerTest {
+
+	@MockitoBean
+	private JwtDecoder jwtDecoder;
 
 	private static final PokemonSummary BULBASAUR = new PokemonSummary(1, "bulbasaur", "https://img.example/1.png",
 			"Seed Pokémon", List.of("grass", "poison"), 6.9, List.of("overgrow", "chlorophyll"));
