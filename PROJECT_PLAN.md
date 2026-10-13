@@ -16,7 +16,7 @@ It adds presentation prep, CI (GitHub Actions), ArchUnit boundary tests, MSW and
 
 | Layer | Technologies |
 |---|---|
-| Language / framework | Java 21, Spring Boot 3, **Gradle (Kotlin DSL)** |
+| Language / framework | Java 21, Spring Boot 4.1, **Gradle (Kotlin DSL)** |
 | External API | Spring `RestClient` with connect/read timeouts; **virtual threads** for parallel calls |
 | Cache | Spring Cache + Caffeine (max 1,000 entries, 24h TTL, `@Cacheable(sync = true)`) |
 | Database | PostgreSQL, Spring Data JPA (Hibernate), Flyway (schema + seed) |
@@ -24,7 +24,7 @@ It adds presentation prep, CI (GitHub Actions), ArchUnit boundary tests, MSW and
 | Validation / errors | Jakarta Bean Validation, `@RestControllerAdvice` |
 | API docs | springdoc-openapi (Swagger UI) |
 | Backend tests | JUnit 5, Mockito, AssertJ, MockMvc, WireMock, Testcontainers, JaCoCo (+ ArchUnit, an addition beyond the docs) |
-| Frontend | React + TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS |
+| Frontend | React 19 + TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS |
 | Frontend tests | Vitest, React Testing Library (+ MSW for API mocking, an addition beyond the docs) |
 | Delivery | Docker, Docker Compose (db + backend + frontend), GitHub, GitHub Actions CI (addition) |
 

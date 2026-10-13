@@ -210,13 +210,13 @@ This document lists, for each feature of the project:
 
 | Layer | Technologies |
 |---|---|
-| Language & framework | Java 21, Spring Boot 3, Gradle (Kotlin DSL) |
+| Language & framework | Java 21, Spring Boot 4.1, Gradle (Kotlin DSL) |
 | External API | Spring `RestClient` (with timeouts), virtual threads |
 | Cache | Spring Cache + Caffeine (size limit, expiry, `sync = true`) |
 | Database | PostgreSQL, Spring Data JPA, Flyway |
 | Security | Spring Security, JWT, BCrypt |
 | Validation & errors | Jakarta Bean Validation, `@RestControllerAdvice` |
 | Backend testing | JUnit 5, Mockito, AssertJ, MockMvc, WireMock, Testcontainers, JaCoCo |
-| Frontend | React, TypeScript, Vite, React Router, TanStack Query, React Hook Form, Zod, Tailwind CSS |
+| Frontend | React 19, TypeScript, Vite, React Router, TanStack Query, React Hook Form, Zod, Tailwind CSS |
 | Frontend testing | Vitest, React Testing Library |
 | Delivery | Docker, Docker Compose, GitHub, Swagger UI |
