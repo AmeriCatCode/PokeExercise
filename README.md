@@ -6,6 +6,8 @@ The backend follows **Clean Architecture** and is built with **TDD**. A **React*
 
 > ✅ **Status:** all four user stories (catalog, detail, import, update and delete), authentication and delivery (Docker, demo data, CI with a coverage gate) are done. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the plan.
 
+> ℹ️ **Scope:** everything in this README is about the Pokédex app (`backend/`, `frontend/`, `docker-compose.yml`). The [GenAI exercise](#genai-exercise-separate-project) is a separate project with its own [README](genai-exercise/task-api/README.md).
+
 ## Quick start (Docker)
 
 Only Docker is needed:
@@ -52,6 +54,12 @@ Good to know:
 | [User_stories_imp.md](User_stories_imp.md) | TDD implementation plan per user story (tests written first) |
 | [PROJECT_PLAN.md](PROJECT_PLAN.md) | Overall plan: architecture, API, implementation order, verification |
 
+## GenAI exercise (separate project)
+
+[`genai-exercise/`](genai-exercise/) holds the "Generative AI Tools" part of the exercise: the [prompt](genai-exercise/PROMPT.md), the generated Task Management API ([`task-api/`](genai-exercise/task-api/)) and [how the output was reviewed](genai-exercise/AI_REVIEW.md).
+
+It is **independent of the Pokédex app**: its own Gradle build, in-memory H2 database and port (**8081**), and it is not part of `docker compose`. See its [README](genai-exercise/task-api/README.md) to run it.
+
 ## Tech stack
 
 | Area | Technologies |
@@ -84,6 +92,7 @@ Good to know:
 ├── backend/Dockerfile       Backend image (multi-stage, non-root)
 ├── frontend/Dockerfile      Frontend image (nginx, non-root) + frontend/nginx.conf
 ├── docker-compose.yml       Database, backend and frontend, with health checks
+├── genai-exercise/          GenAI exercise: prompt, Task API, review notes (separate project)
 ├── .env.example             Settings for docker compose
 └── .github/workflows/ci.yml Build, tests and coverage gate on every push
 ```
@@ -92,7 +101,7 @@ Good to know:
 
 ## Local development
 
-For working on the code, run the database in Docker and the backend and frontend on your machine.
+For working on the Pokédex code, run the database in Docker and the backend and frontend on your machine. (The GenAI Task API has its own steps in [its README](genai-exercise/task-api/README.md).)
 
 ### Prerequisites
 
@@ -144,6 +153,8 @@ The demo accounts above work here too: the backend adds the demo data to the loc
 | `VITE_API_PROXY_TARGET` | `http://localhost:8080` | Frontend dev server proxy |
 
 ## Tests
+
+Pokédex tests (the GenAI Task API runs its own with `./gradlew test` from `genai-exercise/task-api`):
 
 ```bash
 cd backend && ./gradlew check
