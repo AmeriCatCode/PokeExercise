@@ -42,6 +42,9 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	// Run virtual threads on 2 carrier threads, like a small CI runner or server, whatever the
+	// developer machine has: blocking that pins carrier threads then shows up in the tests.
+	jvmArgs("-Djdk.virtualThreadScheduler.parallelism=2")
 	finalizedBy(tasks.jacocoTestReport)
 }
 
