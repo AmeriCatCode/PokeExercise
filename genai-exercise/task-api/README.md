@@ -19,24 +19,25 @@ Seeded users: `alice`, `bob` (see `src/main/resources/data.sql`). The database i
 ## Get a token
 
 Registration, login and token issuing are out of scope for the API. For local use, `tools/DevToken.java` mints an
-HS256 JWT (valid 1 hour) with the same dev secret the API checks. It needs only the JDK:
+HS256 JWT (valid 1 hour) with the same dev secret the API checks. It needs only the JDK, and the API doesn't
+have to be running. From this folder:
 
 ```bash
-TOKEN=$(java tools/DevToken.java alice)
+java tools/DevToken.java alice
 ```
 
-PowerShell: `$TOKEN = java tools/DevToken.java alice`
+It prints the token (one long string with two dots); copy it into Postman, Swagger UI or your client.
+To keep it in a variable instead:
 
-If you set `APP_JWT_SECRET` (at least 32 characters) for the API, set it for the helper too.
+- Bash: `TOKEN=$(java tools/DevToken.java alice)`
+- PowerShell: `$TOKEN = java tools/DevToken.java alice`
 
-## Try it in the browser (Swagger UI)
+Notes:
 
-Opening `http://localhost:8081/api/tasks` directly in a browser always gives 401: the browser can't send the
-bearer token. Use Swagger UI instead:
-
-1. Open http://localhost:8081/swagger-ui.html
-2. Click **Authorize**, paste the token (without the word `Bearer`), click **Authorize**, then **Close**.
-3. Pick an endpoint → **Try it out** → **Execute**.
+- Use `alice` or `bob`. A token for any other name is correctly signed, but the API returns 401 because that user doesn't exist.
+- When requests start returning 401, the token has probably expired: run the command again for a new one.
+- Restarting the app doesn't invalidate tokens, but it does erase all tasks (in-memory database).
+- If you set `APP_JWT_SECRET` (at least 32 characters) for the API, set it for the helper too.
 
 ## Try it with Postman
 
