@@ -8,6 +8,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/pokedex}
     username: ${DB_USERNAME:pokedex}
     password: ${DB_PASSWORD:pokedex}
+  flyway:
+    # The schema (db/migration) and the demo data (db/seed: demo users and a few imported Pokémon).
+    # To start without the demo data: FLYWAY_LOCATIONS=classpath:db/migration
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration,classpath:db/seed}
   jpa:
     # The schema is owned by Flyway (src/main/resources/db/migration); Hibernate only checks it matches.
     hibernate:

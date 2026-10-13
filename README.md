@@ -4,7 +4,44 @@ A full-stack application built around a **Java / Spring Boot REST API** that int
 
 The backend follows **Clean Architecture** and is built with **TDD**. A **React** frontend consumes the API.
 
-> 🚧 **Status:** Step 0 (project setup), Step 1 (US-01, Pokémon catalog), Step 2 (US-02, detail view), Step 3 (authentication), Step 4 (US-03, import) and Step 5 (US-04, update and delete) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> ✅ **Status:** all four user stories (catalog, detail, import, update and delete), authentication and delivery (Docker, demo data, CI with a coverage gate) are done. See [PROJECT_PLAN.md](PROJECT_PLAN.md) for the plan.
+
+## Quick start (Docker)
+
+Only Docker is needed:
+
+```bash
+docker compose up --build
+```
+
+When the three containers are healthy, open **http://localhost:3000** and log in with a demo account:
+
+| Username | Password |
+|---|---|
+| `ash` | `Pikachu123` |
+| `misty` | `Togepi123` |
+
+These are **mock credentials** for the demo only. The demo data also has five imported Pokémon (Bulbasaur, Charmander, Squirtle, Pikachu and Eevee); three of them already have a local name, region and tags.
+
+| URL | What |
+|---|---|
+| http://localhost:3000 | The app |
+| http://localhost:8080/swagger-ui.html | API documentation (Swagger UI); use **Authorize** with a token from `POST /api/auth/login` |
+| http://localhost:8080/actuator/health | Backend health check |
+
+What runs:
+
+| Service | Image | Notes |
+|---|---|---|
+| `db` | PostgreSQL 16 | Data kept in the `pokedex-db` volume. Host port 5433. |
+| `backend` | Multi-stage Gradle build → `eclipse-temurin:21-jre`, non-root user | Flyway creates the schema and the demo data at start. Waits for the database to be healthy. |
+| `frontend` | Vite build → nginx (non-root) | Serves the app and forwards `/api` to the backend, so the browser only talks to one origin. Waits for the backend to be healthy. |
+
+Good to know:
+- Ports and settings can be changed in a `.env` file: copy [.env.example](.env.example).
+- Without `JWT_SECRET`, the backend makes a new signing key at each start, so everyone has to log in again after a restart. Set one in `.env` to keep sessions (`openssl rand -base64 32`).
+- The demo data only adds what is missing: it never overwrites users or Pokémon that already exist. To start without it, set `FLYWAY_LOCATIONS=classpath:db/migration`.
+- Stop with `docker compose down`; add `-v` to also delete the database.
 
 ## Documentation
 
@@ -21,7 +58,7 @@ The backend follows **Clean Architecture** and is built with **TDD**. A **React*
 |---|---|
 | Backend | Java 21, Spring Boot 4.1, Gradle (Kotlin DSL), Spring `RestClient`, virtual threads |
 | Data | PostgreSQL, Spring Data JPA, Flyway |
-| Cache | Spring Cache + Caffeine |
+| Cache | Caffeine (async cache, safe on virtual threads) |
 | Security | Spring Security, JWT, BCrypt |
 | Backend tests | JUnit 5, Mockito, AssertJ, MockMvc, WireMock, Testcontainers, ArchUnit, JaCoCo |
 | Frontend | React 19, TypeScript, Vite, React Router, TanStack Query, React Hook Form + Zod, Tailwind CSS |
@@ -32,6 +69,7 @@ The backend follows **Clean Architecture** and is built with **TDD**. A **React*
 
 ```
 ├── backend/                 Spring Boot API
+│   ├── src/main/resources/db/ Flyway: migration/ (schema), seed/ (demo data)
 │   └── src/main/java/com/example/pokedex/
 │       ├── domain/          Business entities and rules (pure Java)
 │       ├── application/     Use cases and ports (pure Java)
@@ -43,13 +81,18 @@ The backend follows **Clean Architecture** and is built with **TDD**. A **React*
 │       ├── api/             API client and server-state configuration
 │       ├── features/        One folder per feature (catalog, auth, local)
 │       └── test/            Test setup (MSW fake API)
-├── docker-compose.yml       PostgreSQL for local development
-└── .github/workflows/ci.yml Build and tests on every push
+├── backend/Dockerfile       Backend image (multi-stage, non-root)
+├── frontend/Dockerfile      Frontend image (nginx, non-root) + frontend/nginx.conf
+├── docker-compose.yml       Database, backend and frontend, with health checks
+├── .env.example             Settings for docker compose
+└── .github/workflows/ci.yml Build, tests and coverage gate on every push
 ```
 
 **Architecture rule:** dependencies point inward only (`web` / `infrastructure` → `application` → `domain`). The domain and application layers don't depend on Spring. `ArchitectureTest` enforces this on every build.
 
-## Getting started
+## Local development
+
+For working on the code, run the database in Docker and the backend and frontend on your machine.
 
 ### Prerequisites
 
@@ -79,6 +122,8 @@ cd frontend && npm install && npm run dev
 | http://localhost:8080/swagger-ui.html | API documentation (Swagger UI) |
 | http://localhost:8080/actuator/health | Backend health check |
 
+The demo accounts above work here too: the backend adds the demo data to the local database at start. Stop the Docker `backend` and `frontend` containers first if they are running (`docker compose stop backend frontend`), since they use the same ports.
+
 ### Configuration
 
 | Variable | Default | Used by |
@@ -92,23 +137,27 @@ cd frontend && npm install && npm run dev
 | `JWT_SECRET` | *(empty)* | Backend: base64 key of at least 32 bytes that signs login tokens. When empty, a random key is generated at each start (fine locally: tokens just stop working after a restart). **Set it in any shared environment.** |
 | `JWT_TTL` | `1h` | Backend: how long a login token is valid |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Backend: browser origins allowed to call the API directly |
+| `FLYWAY_LOCATIONS` | `classpath:db/migration,classpath:db/seed` | Backend: schema migrations plus demo data. Use `classpath:db/migration` to start without the demo data. |
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `pokedex` / `pokedex` / `pokedex` | docker-compose (local development only) |
 | `POSTGRES_PORT` | `5433` | docker-compose: host port of the database (not 5432, so it doesn't clash with a locally installed PostgreSQL) |
+| `FRONTEND_PORT` / `BACKEND_PORT` | `3000` / `8080` | docker-compose: host ports of the app and the API |
 | `VITE_API_PROXY_TARGET` | `http://localhost:8080` | Frontend dev server proxy |
 
 ## Tests
 
 ```bash
-cd backend && ./gradlew test
+cd backend && ./gradlew check
 ```
 
-Docker must be running: the database tests start a real PostgreSQL with Testcontainers. The coverage report is written to `backend/build/reports/jacoco/test/html/index.html`.
+Runs all backend tests, then the **coverage rule**: the `domain` and `application` packages (business rules and use cases) must keep at least 80% line and branch coverage, or the build fails. Currently they are at 92–100%. Docker must be running: the database tests start a real PostgreSQL with Testcontainers. The coverage report is written to `backend/build/reports/jacoco/test/html/index.html`.
+
+What the backend tests cover: domain rules (unit), use cases with fakes (unit), the PokeAPI adapter against WireMock (parallel loading, timeouts, cache), the database adapters against PostgreSQL (unique constraints, optimistic locking, simultaneous imports, updates and deletes, the demo data), the controllers with MockMvc (status codes and the error format), full-stack integration tests, and `ArchitectureTest` (layer rules).
 
 ```bash
 cd frontend && npm test
 ```
 
-Other frontend checks: `npm run lint`, `npm run typecheck`, `npm run build`.
+Other frontend checks: `npm run lint`, `npm run typecheck`, `npm run build`. The frontend tests render the real app against a fake API (MSW): every screen, form validation, the 404 and 409 messages, disabled buttons while a request runs, out-of-order paging, and reloading fresh data.
 
 ## API
 
@@ -149,3 +198,23 @@ Every error uses the same JSON body:
 ```
 
 `fieldErrors` lists the invalid fields of a `400` response (`{ "field": "...", "message": "..." }`). Unexpected errors return `500` with a generic message; internal details are never exposed.
+
+## User stories → API → screens
+
+| User story | API | Screen |
+|---|---|---|
+| US-01 Browse the catalog | `GET /api/pokemon` | **Catalog** (`/`, `?page=`): cards with sprite, category, types, weight and abilities; Previous / Next |
+| US-02 See a Pokémon's detail | `GET /api/pokemon/{idOrName}` | **Detail** (`/pokemon/:idOrName`): artwork, category, types, stats, description, evolution; for logged-in users, Import or "Already imported – View local version" |
+| US-03 Import a Pokémon | `POST /api/local-pokemon`, `GET /api/local-pokemon`, `GET /api/local-pokemon/{id}` | **Import** button on the detail; **My Pokémon** (`/local`); **local Pokémon** (`/local/:id`) |
+| US-04 Change or delete local data | `PUT /api/local-pokemon/{id}`, `DELETE /api/local-pokemon/{id}?version=` | **Edit** and **Delete** on the local Pokémon screen, with the 409 "Reload" flow |
+| Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | **Register** (`/register`), **Log in** (`/login`), "Signed in as …" and **Log out** in the header |
+
+## Accepted behaviors
+
+These are deliberate trade-offs, described in [Project_description.md](Project_description.md):
+
+- **Lists are split into pages by position.** If someone imports or deletes a Pokémon while another user moves between pages, one Pokémon can appear on two pages or be skipped once. Nothing is lost; reloading shows the correct list.
+- **No live updates.** An open screen doesn't change the instant someone else edits or deletes the Pokémon. It reloads when it is opened again or when the user returns to the browser tab, and any action on an outdated screen gets a clear `404` or `409`.
+- **Logout happens in the browser.** The token is deleted there; the server keeps no sessions, so a copied token stays valid until it expires (`JWT_TTL`, 1 hour by default).
+- **A retry after a lost answer gets `409`.** If a save succeeds but the answer never arrives, saving again finds a new version. The message asks the user to reload, and they see that their change was saved.
+- **The PokeAPI cache belongs to each backend instance.** With several instances, each one has its own cache. All the rules that protect data (unique keys, versions) live in the database, so they hold for any number of instances.

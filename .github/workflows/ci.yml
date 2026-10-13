@@ -27,8 +27,9 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6
       # Testcontainers uses the Docker daemon available on ubuntu-latest.
-      - name: Test
-        run: ./gradlew test
+      # Tests, then the coverage rule (at least 80% on domain and application).
+      - name: Test and check coverage
+        run: ./gradlew check
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7

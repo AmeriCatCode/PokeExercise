@@ -1,3 +1,7 @@
+# The whole application: PostgreSQL, the Spring Boot API and the React frontend (nginx).
+#   docker compose up --build        → http://localhost:3000 (Swagger: http://localhost:8080/swagger-ui.html)
+#   docker compose up -d db          → only the database, for local development (see README)
+# Settings can be changed in a .env file next to this one (see .env.example).
 services:
   db:
     image: postgres:16-alpine
@@ -15,6 +19,45 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-pokedex}
+      DB_USERNAME: ${POSTGRES_USER:-pokedex}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-pokedex}
+      # Empty: a random key per start (logins end when the container restarts). Set one in .env to keep them.
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_TTL: ${JWT_TTL:-1h}
+      POKEAPI_BASE_URL: ${POKEAPI_BASE_URL:-https://pokeapi.co/api/v2}
+      # Schema + demo data; set to classpath:db/migration to start without the demo data.
+      FLYWAY_LOCATIONS: ${FLYWAY_LOCATIONS:-classpath:db/migration,classpath:db/seed}
+    ports:
+      # Direct access to the API and Swagger UI; the frontend reaches it inside the Compose network.
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:8080"
+    healthcheck:
+      # 127.0.0.1, not localhost: inside the container localhost is IPv6 first, and nginx listens on IPv4.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pokedex-db:

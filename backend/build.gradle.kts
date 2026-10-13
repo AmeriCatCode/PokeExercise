@@ -56,6 +56,8 @@ tasks.withType<Test> {
 	// Run virtual threads on 2 carrier threads, like a small CI runner or server, whatever the
 	// developer machine has: blocking that pins carrier threads then shows up in the tests.
 	jvmArgs("-Djdk.virtualThreadScheduler.parallelism=2")
+	// Tests start from an empty database (schema only); SeedDataTest checks the demo data on its own.
+	systemProperty("spring.flyway.locations", "classpath:db/migration")
 	finalizedBy(tasks.jacocoTestReport)
 }
 
@@ -65,4 +67,28 @@ tasks.jacocoTestReport {
 		xml.required = true
 		html.required = true
 	}
+}
+
+// The business rules (domain) and use cases (application) must stay well tested: at least 80% of their
+// lines and branches. Part of `./gradlew check` (run by CI).
+tasks.jacocoTestCoverageVerification {
+	dependsOn(tasks.test)
+	violationRules {
+		rule {
+			element = "PACKAGE"
+			includes = listOf("com.example.pokedex.domain.*", "com.example.pokedex.application.*")
+			limit {
+				counter = "LINE"
+				minimum = "0.80".toBigDecimal()
+			}
+			limit {
+				counter = "BRANCH"
+				minimum = "0.80".toBigDecimal()
+			}
+		}
+	}
+}
+
+tasks.check {
+	dependsOn(tasks.jacocoTestCoverageVerification)
 }
