@@ -1,0 +1,26 @@
+server:
+  # 8081 so it can run next to the Pokédex backend (8080) and frontend (3000).
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: task-api
+  datasource:
+    url: jdbc:h2:mem:tasks;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    # Run data.sql (demo users) after Hibernate has created the schema.
+    defer-datasource-initialization: true
+  jackson:
+    deserialization:
+      # Reject unexpected fields such as "userId" or "user" instead of silently ignoring them.
+      fail-on-unknown-properties: true
+
+app:
+  jwt:
+    # HS256 needs at least 256 bits. Override with APP_JWT_SECRET outside local development.
+    secret: ${APP_JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}

@@ -1,0 +1,96 @@
+{
+  "info": {
+    "name": "Task API (GenAI exercise)",
+    "description": "Set the collection variable `token` to the output of `java tools/DevToken.java alice` (valid 1 hour). Run the requests top to bottom: Create saves the new task id in `taskId`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "token", "value": "" },
+    { "key": "taskId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Create task (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "if (pm.response.code === 201) { pm.collectionVariables.set('taskId', pm.response.json().id); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Prepare demo\",\n  \"description\": \"GenAI section\",\n  \"status\": \"TODO\",\n  \"dueDate\": \"2026-10-20\"\n}"
+        },
+        "url": "{{baseUrl}}/api/tasks"
+      }
+    },
+    {
+      "name": "List my tasks (200)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks" }
+    },
+    {
+      "name": "Get task (200)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId}}" }
+    },
+    {
+      "name": "Update task (200)",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Prepare demo\",\n  \"description\": \"Slides ready\",\n  \"status\": \"IN_PROGRESS\",\n  \"dueDate\": \"2026-10-20\"\n}"
+        },
+        "url": "{{baseUrl}}/api/tasks/{{taskId}}"
+      }
+    },
+    {
+      "name": "Invalid body (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"\",\n  \"status\": \"TODO\"\n}" },
+        "url": "{{baseUrl}}/api/tasks"
+      }
+    },
+    {
+      "name": "userId in body is rejected (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Sneaky\",\n  \"status\": \"TODO\",\n  \"userId\": 2\n}" },
+        "url": "{{baseUrl}}/api/tasks"
+      }
+    },
+    {
+      "name": "No token (401)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": "{{baseUrl}}/api/tasks"
+      }
+    },
+    {
+      "name": "Delete task (204)",
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/api/tasks/{{taskId}}" }
+    },
+    {
+      "name": "Get deleted task (404)",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/{{taskId}}" }
+    }
+  ]
+}
