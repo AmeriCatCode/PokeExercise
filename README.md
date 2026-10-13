@@ -4,7 +4,7 @@ A full-stack application built around a **Java / Spring Boot REST API** that int
 
 The backend follows **Clean Architecture** and is built with **TDD**. A **React** frontend consumes the API.
 
-> 🚧 **Status:** Step 0 (project setup) and Step 1 (US-01, Pokémon catalog) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
+> 🚧 **Status:** Step 0 (project setup), Step 1 (US-01, Pokémon catalog) and Step 2 (US-02, detail view) are done. The other user stories are implemented step by step; see [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
 ## Documentation
 
@@ -109,8 +109,11 @@ Other frontend checks: `npm run lint`, `npm run typecheck`, `npm run build`.
 | Method & path | Access | Description |
 |---|---|---|
 | `GET /api/pokemon?page=0&size=20` | Public | US-01: catalog page (zero-based `page`, `size` 1–50, default 20). Each item has sprite, category, types, weight (kg) and abilities. `400` for invalid paging, `502` if PokeAPI is slow or down. |
+| `GET /api/pokemon/{idOrName}` | Public | US-02: detail by number or name (any case): official artwork, category, types, height, weight, abilities, base stats, description and evolution lineage. `404` for an unknown Pokémon, `400` for an invalid name, `502` if PokeAPI is slow or down. |
 
 How US-01 works: PokeAPI's list only returns names, so for each Pokémon of the page the backend fetches its details and its species (where the category lives). The Pokémon of a page are fetched **in parallel on virtual threads**, with timeouts. If any of them fails, the whole page returns `502`. Responses are cached (Caffeine) by Pokémon id. A name in any case ("Pikachu", "pikachu") points to the same entry, errors are never cached, and simultaneous requests for the same uncached Pokémon make a single PokeAPI call.
+
+How US-02 works: the detail combines three PokeAPI resources: the Pokémon (artwork, types, stats), its species (category and the most recent English Pokédex text, cleaned of the games' line breaks) and the species' evolution chain. The chain is a tree, flattened into ordered stages; each stage records what it evolves from, so branching evolutions (Eevee, Wurmple) display correctly. All three resources are cached, so a repeated detail makes no PokeAPI call.
 
 ## API conventions
 

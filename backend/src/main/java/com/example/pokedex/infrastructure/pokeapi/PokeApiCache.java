@@ -1,5 +1,6 @@
 package com.example.pokedex.infrastructure.pokeapi;
 
+import com.example.pokedex.infrastructure.pokeapi.dto.EvolutionChainDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.PokemonDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.SpeciesDto;
 import com.github.benmanes.caffeine.cache.AsyncCache;
@@ -39,12 +40,14 @@ public class PokeApiCache {
 	private final AsyncCache<Integer, PokemonDto> pokemonById;
 	private final AsyncCache<String, Integer> pokemonIdByName;
 	private final AsyncCache<Integer, SpeciesDto> speciesById;
+	private final AsyncCache<Integer, EvolutionChainDto> evolutionChainById;
 
 	public PokeApiCache(PokeApiClient client, PokeApiProperties.CacheSettings settings, Ticker ticker) {
 		this.client = client;
 		this.pokemonById = newCache(settings, ticker);
 		this.pokemonIdByName = newCache(settings, ticker);
 		this.speciesById = newCache(settings, ticker);
+		this.evolutionChainById = newCache(settings, ticker);
 	}
 
 	/**
@@ -60,6 +63,10 @@ public class PokeApiCache {
 
 	public SpeciesDto species(int id) {
 		return get(speciesById, id, client::getSpecies);
+	}
+
+	public EvolutionChainDto evolutionChain(int id) {
+		return get(evolutionChainById, id, client::getEvolutionChain);
 	}
 
 	private PokemonDto loadById(int id) {

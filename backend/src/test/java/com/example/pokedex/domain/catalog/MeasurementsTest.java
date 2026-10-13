@@ -12,4 +12,10 @@ class MeasurementsTest {
 		assertThat(Measurements.hectogramsToKilograms(9050)).isEqualTo(905.0);
 		assertThat(Measurements.hectogramsToKilograms(0)).isEqualTo(0.0);
 	}
+
+	@Test
+	void convertsDecimetresToMetres() {
+		assertThat(Measurements.decimetresToMetres(7)).isEqualTo(0.7);
+		assertThat(Measurements.decimetresToMetres(20)).isEqualTo(2.0);
+	}
 }

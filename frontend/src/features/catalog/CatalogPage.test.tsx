@@ -166,6 +166,34 @@ describe('CatalogPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('opens the detail when a card is clicked, and goes back to the same catalog page', async () => {
+    const user = userEvent.setup()
+    server.use(
+      catalog(),
+      http.get('/api/pokemon/:idOrName', ({ params }) =>
+        HttpResponse.json({
+          ...pokemon(4),
+          name: String(params.idOrName),
+          imageUrl: null,
+          heightM: 0.6,
+          stats: [],
+          description: 'A detail.',
+          evolution: [],
+        }),
+      ),
+    )
+    renderApp('/?page=2')
+
+    await user.click(await screen.findByRole('link', { name: /Pokemon 4/ }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pokemon 4' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back to the catalog' }))
+
+    expect(await screen.findByRole('heading', { name: 'Pokemon 4' })).toBeInTheDocument()
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument()
+  })
+
   it('shows the page the user ended on when "Next" is clicked quickly, even if answers arrive out of order', async () => {
     const user = userEvent.setup()
     // Page 2 answers after page 3.

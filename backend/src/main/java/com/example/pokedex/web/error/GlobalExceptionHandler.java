@@ -2,6 +2,7 @@ package com.example.pokedex.web.error;
 
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
 import com.example.pokedex.domain.exception.InvalidRequestException;
+import com.example.pokedex.domain.exception.PokemonNotFoundException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,11 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex) {
 		return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST,
 				List.of(new ErrorResponse.FieldError(ex.getField(), ex.getReason())));
+	}
+
+	@ExceptionHandler(PokemonNotFoundException.class)
+	ResponseEntity<ErrorResponse> handlePokemonNotFound(PokemonNotFoundException ex) {
+		return build(HttpStatus.NOT_FOUND, "Pokémon not found", List.of());
 	}
 
 	@ExceptionHandler(CatalogUnavailableException.class)

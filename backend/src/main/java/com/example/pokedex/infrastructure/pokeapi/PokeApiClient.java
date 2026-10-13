@@ -2,6 +2,7 @@ package com.example.pokedex.infrastructure.pokeapi;
 
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
 import com.example.pokedex.domain.exception.PokemonNotFoundException;
+import com.example.pokedex.infrastructure.pokeapi.dto.EvolutionChainDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.PokemonDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.PokemonListDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.SpeciesDto;
@@ -40,14 +41,20 @@ public class PokeApiClient {
 				.body(PokemonDto.class));
 	}
 
+	/** The species id comes from a Pokémon, so a missing species means bad data: it is "unavailable". */
 	public SpeciesDto getSpecies(int id) {
 		return call(() -> restClient.get()
 				.uri("/pokemon-species/{id}", id)
 				.retrieve()
-				.onStatus(status -> status.isSameCodeAs(HttpStatus.NOT_FOUND), (request, response) -> {
-					throw new PokemonNotFoundException("species " + id);
-				})
 				.body(SpeciesDto.class));
+	}
+
+	/** The chain id comes from a species, so a missing chain means bad data: it is "unavailable". */
+	public EvolutionChainDto getEvolutionChain(int id) {
+		return call(() -> restClient.get()
+				.uri("/evolution-chain/{id}", id)
+				.retrieve()
+				.body(EvolutionChainDto.class));
 	}
 
 	private static <T> T call(Supplier<T> request) {

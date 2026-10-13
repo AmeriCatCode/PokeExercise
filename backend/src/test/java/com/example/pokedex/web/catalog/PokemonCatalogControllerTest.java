@@ -8,9 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.example.pokedex.application.usecase.GetPokemonDetailUseCase;
 import com.example.pokedex.application.usecase.ListPokemonUseCase;
+import com.example.pokedex.domain.catalog.EvolutionStage;
+import com.example.pokedex.domain.catalog.PokemonDetail;
 import com.example.pokedex.domain.catalog.PokemonSummary;
+import com.example.pokedex.domain.catalog.Stat;
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
+import com.example.pokedex.domain.exception.InvalidRequestException;
+import com.example.pokedex.domain.exception.PokemonNotFoundException;
 import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.web.error.GlobalExceptionHandler;
 import java.util.List;
@@ -31,8 +37,71 @@ class PokemonCatalogControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
+	private static final PokemonDetail BULBASAUR_DETAIL = new PokemonDetail(1, "bulbasaur",
+			"https://img.example/1.png", "https://img.example/artwork/1.png", "Seed Pokémon",
+			List.of("grass", "poison"), 0.7, 6.9, List.of("overgrow", "chlorophyll"),
+			List.of(new Stat("hp", 45), new Stat("attack", 49)),
+			"A strange seed was planted on its back at birth.",
+			List.of(new EvolutionStage(1, 1, "bulbasaur", null), new EvolutionStage(2, 2, "ivysaur", "bulbasaur")));
+
 	@MockitoBean
 	private ListPokemonUseCase listPokemon;
+
+	@MockitoBean
+	private GetPokemonDetailUseCase getPokemonDetail;
+
+	@Test
+	void returnsTheDetailOfAPokemon() throws Exception {
+		when(getPokemonDetail.get("bulbasaur")).thenReturn(BULBASAUR_DETAIL);
+
+		mockMvc.perform(get("/api/pokemon/bulbasaur"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(1))
+				.andExpect(jsonPath("$.name").value("bulbasaur"))
+				.andExpect(jsonPath("$.imageUrl").value("https://img.example/artwork/1.png"))
+				.andExpect(jsonPath("$.spriteUrl").value("https://img.example/1.png"))
+				.andExpect(jsonPath("$.category").value("Seed Pokémon"))
+				.andExpect(jsonPath("$.types[1]").value("poison"))
+				.andExpect(jsonPath("$.heightM").value(0.7))
+				.andExpect(jsonPath("$.weightKg").value(6.9))
+				.andExpect(jsonPath("$.abilities[0]").value("overgrow"))
+				.andExpect(jsonPath("$.stats[0].name").value("hp"))
+				.andExpect(jsonPath("$.stats[0].baseValue").value(45))
+				.andExpect(jsonPath("$.description").value("A strange seed was planted on its back at birth."))
+				.andExpect(jsonPath("$.evolution[1].stage").value(2))
+				.andExpect(jsonPath("$.evolution[1].speciesId").value(2))
+				.andExpect(jsonPath("$.evolution[1].name").value("ivysaur"))
+				.andExpect(jsonPath("$.evolution[1].evolvesFrom").value("bulbasaur"));
+	}
+
+	@Test
+	void returns404ForAnUnknownPokemon() throws Exception {
+		when(getPokemonDetail.get("missingno")).thenThrow(new PokemonNotFoundException("missingno"));
+
+		mockMvc.perform(get("/api/pokemon/missingno"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.status").value(404))
+				.andExpect(jsonPath("$.message").value("Pokémon not found"))
+				.andExpect(jsonPath("$.fieldErrors").isEmpty());
+	}
+
+	@Test
+	void returns400ForAnInvalidIdOrName() throws Exception {
+		when(getPokemonDetail.get("pika_chu")).thenThrow(new InvalidRequestException("idOrName", "is invalid"));
+
+		mockMvc.perform(get("/api/pokemon/pika_chu"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("idOrName"));
+	}
+
+	@Test
+	void returns502ForTheDetailWhenPokeApiIsUnavailable() throws Exception {
+		when(getPokemonDetail.get("1")).thenThrow(new CatalogUnavailableException("timeout"));
+
+		mockMvc.perform(get("/api/pokemon/1"))
+				.andExpect(status().isBadGateway())
+				.andExpect(jsonPath("$.message").value("PokeAPI is unavailable, please try again later"));
+	}
 
 	@Test
 	void returnsTheItemsAndThePageInformation() throws Exception {

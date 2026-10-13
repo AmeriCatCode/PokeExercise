@@ -1,12 +1,15 @@
 package com.example.pokedex.infrastructure.pokeapi;
 
 import com.example.pokedex.application.port.PokemonCatalogPort;
+import com.example.pokedex.domain.catalog.PokemonDetail;
 import com.example.pokedex.domain.catalog.PokemonSummary;
 import com.example.pokedex.domain.exception.CatalogUnavailableException;
 import com.example.pokedex.domain.shared.Page;
 import com.example.pokedex.domain.shared.PageRequest;
+import com.example.pokedex.infrastructure.pokeapi.dto.EvolutionChainDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.PokemonDto;
 import com.example.pokedex.infrastructure.pokeapi.dto.PokemonListDto;
+import com.example.pokedex.infrastructure.pokeapi.dto.SpeciesDto;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -36,6 +39,21 @@ public class PokeApiCatalogAdapter implements PokemonCatalogPort {
 		PokemonListDto list = client.listPokemon(request.offset(), request.size());
 		List<Integer> ids = list.results().stream().map(PokeApiMapper::idFromUrl).toList();
 		return new Page<>(loadInParallel(ids), request.page(), request.size(), list.count());
+	}
+
+	/**
+	 * PokeAPI keeps the detail in three places: the Pokémon (image, types, stats), its species (category,
+	 * description) and the species' evolution chain. Each one is cached, so a repeated detail makes no call.
+	 */
+	@Override
+	public PokemonDetail getPokemonDetail(String idOrName) {
+		PokemonDto pokemon = cache.pokemon(idOrName);
+		SpeciesDto species = cache.species(PokeApiMapper.idFromUrl(pokemon.species()));
+		if (species.evolutionChain() == null) {
+			throw new CatalogUnavailableException("PokeAPI returned a species without evolution chain");
+		}
+		EvolutionChainDto chain = cache.evolutionChain(PokeApiMapper.idFromUrl(species.evolutionChain().url()));
+		return PokeApiMapper.toDetail(pokemon, species, chain);
 	}
 
 	private List<PokemonSummary> loadInParallel(List<Integer> ids) {
